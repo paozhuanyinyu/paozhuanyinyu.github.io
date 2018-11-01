@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="utf-8">
+  
+
+  
+  <title>activity的startActivity和context的startActivity区别 | Hexo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="相信Android开发都遇到过这样一个报错信息 04-09 15:55:08.165: E/AndroidRuntime(3403): android.util.AndroidRuntimeException: Calling startActivity() from outside of an Activity  context requires the FLAG_ACTIVITY_NEW_TA">
+<meta property="og:type" content="article">
+<meta property="og:title" content="activity的startActivity和context的startActivity区别">
+<meta property="og:url" content="http://yoursite.com/2018/09/05/activity的startActivity和context的startActivity区别/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="相信Android开发都遇到过这样一个报错信息 04-09 15:55:08.165: E/AndroidRuntime(3403): android.util.AndroidRuntimeException: Calling startActivity() from outside of an Activity  context requires the FLAG_ACTIVITY_NEW_TA">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2018-11-01T03:58:38.752Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="activity的startActivity和context的startActivity区别">
+<meta name="twitter:description" content="相信Android开发都遇到过这样一个报错信息 04-09 15:55:08.165: E/AndroidRuntime(3403): android.util.AndroidRuntimeException: Calling startActivity() from outside of an Activity  context requires the FLAG_ACTIVITY_NEW_TA">
+  
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+</html>
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Hexo</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://yoursite.com"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-activity的startActivity和context的startActivity区别" class="article article-type-post" itemscope="" itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2018/09/05/activity的startActivity和context的startActivity区别/" class="article-date">
+  <time datetime="2018-09-05T03:14:29.000Z" itemprop="datePublished">2018-09-05</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      activity的startActivity和context的startActivity区别
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>相信Android开发都遇到过这样一个报错信息</p>
+<p><code>04-09 15:55:08.165: E/AndroidRuntime(3403): android.util.AndroidRuntimeException: Calling startActivity() from outside of an Activity  context requires the FLAG_ACTIVITY_NEW_TASK flag. Is this really what you want?</code></p>
+<p>解决办法也很简单，就是在非Activity的Context调用startActivity方法时，Intent添加一个FLAG_ACTIVITY_NEW_TASK的flag，代码如下</p>
+<p><code>intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);</code></p>
+<p>但是细心的同学会发现Android7.0及以上的机型即使没有添加以上代码，也不会崩溃。这是怎么回事呢？</p>
+<p>这就涉及到activity的startActivity和context的startActivity方法之间的区别，Activity也是Context的子类，但是Activity本身实现了startActivity方法，所以两个是不同的。</p>
+<p>activity的startActivity方法最终会调用Activity类的startActivityForResult方法，代码如下</p>
+<pre><code>public void startActivityForResult(@RequiresPermission Intent intent, int requestCode,
+           @Nullable Bundle options) {
+       if (mParent == null) {
+           options = transferSpringboardActivityOptions(options);
+           Instrumentation.ActivityResult ar =
+               mInstrumentation.execStartActivity(
+                   this, mMainThread.getApplicationThread(), mToken, this,
+                   intent, requestCode, options);
+           if (ar != null) {
+               mMainThread.sendActivityResult(
+                   mToken, mEmbeddedID, requestCode, ar.getResultCode(),
+                   ar.getResultData());
+           }
+           if (requestCode &gt;= 0) {
+               // If this start is requesting a result, we can avoid making
+               // the activity visible until the result is received.  Setting
+               // this code during onCreate(Bundle savedInstanceState) or onResume() will keep the
+               // activity hidden during this time, to avoid flickering.
+               // This can only be done when a result is requested because
+               // that guarantees we will get information back when the
+               // activity is finished, no matter what happens to it.
+               mStartedActivity = true;
+           }
+
+           cancelInputsAndStartExitTransition(options);
+           // TODO Consider clearing/flushing other event sources and events for child windows.
+       } else {
+           if (options != null) {
+               mParent.startActivityFromChild(this, intent, requestCode, options);
+           } else {
+               // Note we want to go through this method for compatibility with
+               // existing applications that may have overridden it.
+               mParent.startActivityFromChild(this, intent, requestCode);
+           }
+       }
+   }
+</code></pre><p>context的 startActivity方法最终会调用ContextImpl的startActivity方法，代码如下</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">@Override</span><br><span class="line">public void startActivity(Intent intent, Bundle options) &#123;</span><br><span class="line">    warnIfCallingFromSystemProcess();</span><br><span class="line">    if ((intent.getFlags()&amp;Intent.FLAG_ACTIVITY_NEW_TASK) == 0) &#123;</span><br><span class="line">        throw new AndroidRuntimeException(</span><br><span class="line">                &quot;Calling startActivity() from outside of an Activity &quot;</span><br><span class="line">                + &quot; context requires the FLAG_ACTIVITY_NEW_TASK flag.&quot;</span><br><span class="line">                + &quot; Is this really what you want?&quot;);</span><br><span class="line">    &#125;</span><br><span class="line">    mMainThread.getInstrumentation().execStartActivity(</span><br><span class="line">            getOuterContext(), mMainThread.getApplicationThread(), null,</span><br><span class="line">            (Activity) null, intent, -1, options);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>7.0及以下</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">@Override</span><br><span class="line">public void startActivity(Intent intent, Bundle options) &#123;</span><br><span class="line">    warnIfCallingFromSystemProcess();</span><br><span class="line"></span><br><span class="line">    // Calling start activity from outside an activity without FLAG_ACTIVITY_NEW_TASK is</span><br><span class="line">    // generally not allowed, except if the caller specifies the task id the activity should</span><br><span class="line">    // be launched in.</span><br><span class="line">    if ((intent.getFlags()&amp;Intent.FLAG_ACTIVITY_NEW_TASK) == 0</span><br><span class="line">            &amp;&amp; options != null &amp;&amp; ActivityOptions.fromBundle(options).getLaunchTaskId() == -1) &#123;</span><br><span class="line">        throw new AndroidRuntimeException(</span><br><span class="line">                &quot;Calling startActivity() from outside of an Activity &quot;</span><br><span class="line">                + &quot; context requires the FLAG_ACTIVITY_NEW_TASK flag.&quot;</span><br><span class="line">                + &quot; Is this really what you want?&quot;);</span><br><span class="line">    &#125;</span><br><span class="line">    mMainThread.getInstrumentation().execStartActivity(</span><br><span class="line">            getOuterContext(), mMainThread.getApplicationThread(), null,</span><br><span class="line">            (Activity) null, intent, -1, options);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>从上面代码可以看出，Activity的startActivity方法是不会抛出文章开始说的那个错的；问题集中在非Activity的Context调用startActivity方法，在7.0之前如果Intent没有添加flag:FLAG_ACTIVITY_NEW_TASK，程序是必崩的，7.0及以上如果调用startActivity(intent)方法，是不会崩的，因为此时options为空。一般为了兼容7.0以下版本，我们还是得添加flag的。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">startActivity(intent, null);</span><br></pre></td></tr></table></figure>
+<p>注意7.0增加了两个判断条件</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">if ((intent.getFlags()&amp;Intent.FLAG_ACTIVITY_NEW_TASK) == 0</span><br><span class="line">        &amp;&amp; options != null &amp;&amp; ActivityOptions.fromBundle(options).getLaunchTaskId() == -1) &#123;</span><br><span class="line">    throw new AndroidRuntimeException(</span><br><span class="line">            &quot;Calling startActivity() from outside of an Activity &quot;</span><br><span class="line">            + &quot; context requires the FLAG_ACTIVITY_NEW_TASK flag.&quot;</span><br><span class="line">            + &quot; Is this really what you want?&quot;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>到这里基本上文章就该结束了，但是我们项目在线上还是遇到文章开始说的那个问题，有一些崩溃，都是7.0以下的机型。经过一番寻找，终于定位到有问题的代码，原因是我们用到了Intent的一个方法createChooser（Intent target, CharSequence title）</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">Intent shareIntent = new Intent();</span><br><span class="line">shareIntent.setAction(Intent.ACTION_SEND);</span><br><span class="line">shareIntent.putExtra(Intent.EXTRA_TEXT, text);</span><br><span class="line">shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);</span><br><span class="line">shareIntent.setType(&quot;text/plain&quot;);</span><br><span class="line">Utils.getContext().startActivity(Intent.createChooser(shareIntent, &quot;分享到&quot;));</span><br></pre></td></tr></table></figure>
+<p>从代码上看到我们明明给Intent添加了flag，还是会崩溃</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);</span><br></pre></td></tr></table></figure>
+<p>我们跟进Intent.createChooser方法里看看</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">public static Intent createChooser(Intent target, CharSequence title, IntentSender sender) &#123;</span><br><span class="line">    Intent intent = new Intent(ACTION_CHOOSER);</span><br><span class="line">    intent.putExtra(EXTRA_INTENT, target);</span><br><span class="line">    if (title != null) &#123;</span><br><span class="line">        intent.putExtra(EXTRA_TITLE, title);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    if (sender != null) &#123;</span><br><span class="line">        intent.putExtra(EXTRA_CHOSEN_COMPONENT_INTENT_SENDER, sender);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    // Migrate any clip data and flags from target.</span><br><span class="line">    int permFlags = target.getFlags() &amp; (FLAG_GRANT_READ_URI_PERMISSION</span><br><span class="line">            | FLAG_GRANT_WRITE_URI_PERMISSION | FLAG_GRANT_PERSISTABLE_URI_PERMISSION</span><br><span class="line">            | FLAG_GRANT_PREFIX_URI_PERMISSION);</span><br><span class="line">    if (permFlags != 0) &#123;</span><br><span class="line">        ClipData targetClipData = target.getClipData();</span><br><span class="line">        if (targetClipData == null &amp;&amp; target.getData() != null) &#123;</span><br><span class="line">            ClipData.Item item = new ClipData.Item(target.getData());</span><br><span class="line">            String[] mimeTypes;</span><br><span class="line">            if (target.getType() != null) &#123;</span><br><span class="line">                mimeTypes = new String[] &#123; target.getType() &#125;;</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                mimeTypes = new String[] &#123; &#125;;</span><br><span class="line">            &#125;</span><br><span class="line">            targetClipData = new ClipData(null, mimeTypes, item);</span><br><span class="line">        &#125;</span><br><span class="line">        if (targetClipData != null) &#123;</span><br><span class="line">            intent.setClipData(targetClipData);</span><br><span class="line">            intent.addFlags(permFlags);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    return intent;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>首先这个方法先把原Intent存到新Intent的extra上，</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">intent.putExtra(EXTRA_INTENT, target);</span><br></pre></td></tr></table></figure>
+<p>然后permFlags值为0，就这样，新Intent的flag就没了，所以返回来的Intent的flag值为0，虽然extra里的Intent的flag值为Intent.FLAG_ACTIVITY_NEW_TASK，但是没有，取flag值时不是从extra里的Intent取值。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">int permFlags = target.getFlags() &amp; (FLAG_GRANT_READ_URI_PERMISSION</span><br><span class="line">        | FLAG_GRANT_WRITE_URI_PERMISSION | FLAG_GRANT_PERSISTABLE_URI_PERMISSION</span><br><span class="line">        | FLAG_GRANT_PREFIX_URI_PERMISSION);</span><br></pre></td></tr></table></figure>
+<p>有点坑吧，所以如果使用了Intent.createChooser()方法后还得加上addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Utils.getContext().startActivity(Intent.createChooser(shareIntent, &quot;分享到&quot;).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));</span><br></pre></td></tr></table></figure>
+<p>建议以后如果有非Activity的Context调用startActivity()方法，一定要用7.0以下的机型测试一下，我们手上的测试大部分是7.0的，加上那段代码的使用场景很少，所以导致了线上出现这个bug。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2018/09/05/activity的startActivity和context的startActivity区别/" data-id="cjny29osb0001pgfyha9lnd5i" class="article-share-link">Share</a>
+      
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/2018/11/01/hello-world/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          Hello World
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2018/08/01/Java线程池/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">Java线程池</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+
+  
+    
+
+  
+    
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">November 2018</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">September 2018</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">August 2018</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2018/11/01/hello-world/">Hello World</a>
+          </li>
+        
+          <li>
+            <a href="/2018/09/05/activity的startActivity和context的startActivity区别/">activity的startActivity和context的startActivity区别</a>
+          </li>
+        
+          <li>
+            <a href="/2018/08/01/Java线程池/">Java线程池</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2018 John Doe<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+
+
+
+  </div>
+</body>
+</html>
